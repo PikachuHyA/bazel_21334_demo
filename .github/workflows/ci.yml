@@ -1,0 +1,54 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: remove lld
+      run: sudo apt remove lld
+    - name: get LLVM lld
+      run: |
+        sudo apt download lld
+        sudo apt download lld-18
+        sudo apt download llvm-18
+    - name: unpack
+      run: |
+        ls *.deb | xargs -I {} sh -c 'dpkg -x "$1" .' _ {}
+        mkdir /opt/compiler
+        cp -r ./usr/* /opt/compiler
+    - name: check deb
+      run: |
+        ls -lha usr/bin
+        ldd usr/bin/lld
+        ls /opt/compiler
+    - name: check lld
+      run: |
+        which lld || (echo "no lld in $PATH" && exit 0)
+        /opt/compiler/bin/ld.lld --version
+    - name: check $PATH
+      run: echo $PATH
+    - name: build tools baseline (success)
+      run: |
+        bazel clean --expunge
+        bazel build :tool -s && cat bazel-out/k8-opt-exec-ST-d57f47055a04/bin/demo-0.params
+    - name: build tools with ldd (ERROR here, cannot find 'ld')
+      run: |
+        bazel clean --expunge
+        bazel build :tool -s --action_env=PATH=/opt/compiler/bin:$PATH || cat bazel-out/k8-opt-exec-ST-d57f47055a04/bin/demo-0.params
+    - name: build tools with lld in $PATH (success)
+      run: |
+        bazel clean --expunge
+        PATH=/opt/compiler/bin:$PATH bazel build :tool -s --action_env=PATH=/opt/compiler/bin:$PATH && cat bazel-out/k8-opt-exec-ST-d57f47055a04/bin/demo-0.params
+    - name: build tools with lld in --host_action_env (success)
+      run: |
+        bazel clean --expunge
+        bazel build :tool -s --action_env=PATH=/opt/compiler/bin:$PATH --host_action_env=PATH=/opt/compiler/bin:$PATH && cat bazel-out/k8-opt-exec-ST-d57f47055a04/bin/demo-0.params
