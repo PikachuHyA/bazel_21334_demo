@@ -1,0 +1,12 @@
+load(":demo.bzl", "demo_rule")
+
+cc_binary(
+    name = "demo",
+    srcs = ["main.cc"],
+    # linkopts = ["-Wl,-verbose"],
+)
+
+demo_rule(
+    name = "tool",
+    output_file = "demo_output",
+)
